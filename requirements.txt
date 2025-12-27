@@ -1,0 +1,5 @@
+# Install with: pip install -r requirements.txt
+# (From this folder: C:\Users\HexiMeng\Desktop\SC)
+
+pandas
+psycopg2-binary
