@@ -92,13 +92,13 @@ def main() -> None:
         st.plotly_chart(fig_daily, use_container_width=True)
 
     with col2:
-        st.subheader(f"Top {int(topn)} error_code")
-        top_codes = (
-            dff.groupby(["error_code"], as_index=False)["occurance"].sum()
+        st.subheader(f"Top {int(topn)} 内容")
+        top_contents = (
+            dff.groupby(["内容"], as_index=False)["occurance"].sum()
             .sort_values("occurance", ascending=False)
             .head(int(topn))
         )
-        fig_top = px.bar(top_codes, x="error_code", y="occurance", title="Top error codes")
+        fig_top = px.bar(top_contents, x="内容", y="occurance", title="Top 内容")
         fig_top.update_layout(margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig_top, use_container_width=True)
 
