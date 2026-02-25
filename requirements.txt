@@ -1,11 +1,16 @@
 # Install with: pip install -r requirements.txt
 # (From this folder: C:\Users\HexiMeng\Desktop\SC)
 
-# Pin core scientific stack to Python 3.12-compatible wheels
+# Pin core scientific stack to Python 3.13-compatible wheels
 numpy==2.2.*
 pandas==2.2.*
-psycopg2-binary==2.9.*
+# PostgreSQL driver (Python 3.13-friendly on Windows)
+psycopg[binary]==3.2.*
 
 # Dashboard
 streamlit==1.40.*
 plotly==5.24.*
+
+# Streamlit uses Arrow for DataFrame transport; ensure a working wheel is installed.
+pyarrow==19.0.*
+matplotlib==3.9.*  # For any plotting needs beyond Plotly

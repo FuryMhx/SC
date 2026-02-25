@@ -1,10 +1,26 @@
-import argparse
+
 import os
 import sys
 import time
+from typing import Any, Callable
 
 import pandas as pd
-import psycopg2
+
+# psycopg2 (v2) often fails on newer Python (e.g., 3.13) on Windows with
+# "No module named 'psycopg2._psycopg'" due to missing/unsupported binary wheels.
+# Prefer psycopg2 when it imports cleanly; otherwise fall back to psycopg (v3).
+_pg_connect: Callable[..., Any]
+_pg_driver: str
+try:
+    import psycopg2  # type: ignore
+
+    _pg_connect = psycopg2.connect
+    _pg_driver = 'psycopg2'
+except Exception:  # noqa: BLE001
+    import psycopg  # type: ignore
+
+    _pg_connect = psycopg.connect
+    _pg_driver = 'psycopg'
 
 
 QUERY = '''
@@ -25,20 +41,29 @@ ORDER BY
 '''
 
 
-def _get_pg_connection() -> "psycopg2.extensions.connection":
-    return psycopg2.connect(
-        host=os.getenv('PGHOST', '10.1.3.102'),
-        database=os.getenv('PGDATABASE', 'postgres'),
-        user=os.getenv('PGUSER', 'printer_data'),
-        password=os.getenv('PGPASSWORD', 'printer_data'),
-        port=int(os.getenv('PGPORT', '5432')),
-    )
+def _get_pg_connection() -> Any:
+    host = os.getenv('PGHOST', '10.1.3.102')
+    database = os.getenv('PGDATABASE', 'postgres')
+    user = os.getenv('PGUSER', 'printer_data')
+    password = os.getenv('PGPASSWORD', 'printer_data')
+    port = int(os.getenv('PGPORT', '5432'))
+
+    kwargs: dict[str, Any] = {
+        'host': host,
+        'user': user,
+        'password': password,
+        'port': port,
+    }
+    # psycopg (v3) uses libpq keyword 'dbname'; psycopg2 commonly uses 'database'.
+    kwargs['dbname' if _pg_driver == 'psycopg' else 'database'] = database
+    return _pg_connect(**kwargs)
 
 
 def fetch_printer_summary_df() -> pd.DataFrame:
     cnx = _get_pg_connection()
     try:
         with cnx.cursor() as cursor:
+            cursor.execute("SET client_encoding TO 'UTF8'")
             cursor.execute(QUERY)
             rows = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
@@ -53,9 +78,20 @@ def transform_printer_summary(df_log: pd.DataFrame) -> dict:
     # Note: I kept your regex `[:：],\s*`.
     # Ensure your data actually has "Colon, Comma" (e.g., "Error:, 123").
     # If it is just "Error: 123", remove the comma from regex.
-    pattern = r'[:：],\s*(\d{3})'
+    pattern = r'[:：]\s*,?\s*(\d{3})'
 
     df_log_with_code = df_log.copy()
+    df_log_with_code['error_date'] = pd.to_datetime(df_log_with_code['error_date'], errors='coerce')
+    def _ensure_text(val: Any) -> Any:
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return val
+        if isinstance(val, memoryview):
+            val = val.tobytes()
+        if isinstance(val, (bytes, bytearray)):
+            return val.decode('utf-8', errors='replace')
+        return val if isinstance(val, str) else str(val)
+
+    df_log_with_code['内容'] = df_log_with_code['内容'].apply(_ensure_text)
     df_log_with_code['error_code'] = df_log_with_code['内容'].str.extract(pattern, expand=False)
 
     # Keep only rows that contain an error_code

@@ -1,0 +1,4 @@
+error_code,content,flag
+527,downstream network communication failure,include
+589,,exclude
+337,abnormal wafer,include
