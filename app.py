@@ -33,11 +33,11 @@ def _add_line_column(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _load_rules_csv(uploaded_file, default_path: str = "error_rules.csv") -> pd.DataFrame:
+def _load_rules_csv(uploaded_file, selected_path: str | None) -> pd.DataFrame:
     if uploaded_file is not None:
         rules = pd.read_csv(uploaded_file)
-    elif os.path.exists(default_path):
-        rules = pd.read_csv(default_path)
+    elif selected_path and os.path.exists(selected_path):
+        rules = pd.read_csv(selected_path)
     else:
         return pd.DataFrame()
     rules.columns = [str(col).strip().lower() for col in rules.columns]
@@ -47,11 +47,18 @@ def _load_rules_csv(uploaded_file, default_path: str = "error_rules.csv") -> pd.
 
     if "content" not in rules.columns:
         rules["content"] = ""
+    if "keyword" in rules.columns:
+        rules["content"] = rules["keyword"].fillna("")
+    if "group_label" in rules.columns:
+        rules["group_label"] = rules["group_label"].fillna("")
+    else:
+        rules["group_label"] = rules["content"].fillna("")
     if "flag" not in rules.columns:
         rules["flag"] = ""
 
-    rules = rules[["error_code", "content", "flag"]].copy()
+    rules = rules[["error_code", "content", "group_label", "flag"]].copy()
     rules["content"] = rules["content"].fillna("")
+    rules["group_label"] = rules["group_label"].fillna("")
     rules["flag"] = rules["flag"].fillna("")
     return rules
 
@@ -60,52 +67,90 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
     if rules.empty:
         return df, {}
 
+    def _split_keywords(value: str) -> list[str]:
+        return [part.strip() for part in value.split("|") if part.strip()]
+
     rules = rules.copy()
     rules["error_code"] = pd.to_numeric(rules["error_code"], errors="coerce")
-    rules = rules.dropna(subset=["error_code"]).copy()
-    rules["error_code"] = rules["error_code"].astype(int)
+    rules["error_code"] = rules["error_code"].astype("Int64")
     rules["content"] = rules["content"].astype(str).str.strip()
+    rules["group_label"] = rules["group_label"].astype(str).str.strip()
     rules["flag"] = rules["flag"].astype(str).str.lower().str.strip()
+    rules["content_key"] = rules["content"].str.lower()
 
     exclude_flags = {"exclude", "x", "0", "false", "no", "drop", "remove"}
     exclude_mask = rules["flag"].isin(exclude_flags)
 
     exclude_codes = set(
-        rules.loc[exclude_mask & (rules["content"] == ""), "error_code"].tolist()
+        rules.loc[
+            exclude_mask & (rules["content"] == "") & rules["error_code"].notna(),
+            "error_code",
+        ].tolist()
     )
-    exclude_pairs = set(
-        zip(
-            rules.loc[exclude_mask & (rules["content"] != ""), "error_code"].tolist(),
-            rules.loc[exclude_mask & (rules["content"] != ""), "content"].tolist(),
-        )
-    )
-
     df_out = df.copy()
-    if exclude_codes or exclude_pairs:
+    if exclude_codes:
         drop_mask = df_out["error_code"].isin(exclude_codes)
-        if exclude_pairs:
-            drop_mask |= df_out.apply(
-                lambda row: (row["error_code"], row["内容"]) in exclude_pairs,
-                axis=1,
-            )
+        df_out = df_out.loc[~drop_mask].copy()
+
+    exclude_rules = rules.loc[
+        exclude_mask & (rules["content"] != ""), ["error_code", "content_key"]
+    ]
+    if not exclude_rules.empty:
+        content_key = df_out["内容"].astype(str).str.lower()
+        drop_mask = pd.Series(False, index=df_out.index)
+        for code, keyword in exclude_rules.itertuples(index=False, name=None):
+            if not keyword:
+                continue
+            keywords = _split_keywords(keyword)
+            if pd.isna(code):
+                for key in keywords:
+                    drop_mask |= content_key.str.contains(key, na=False)
+            else:
+                code_mask = df_out["error_code"] == int(code)
+                for key in keywords:
+                    drop_mask |= code_mask & content_key.str.contains(key, na=False)
         df_out = df_out.loc[~drop_mask].copy()
 
     group_mask = (~exclude_mask) & (rules["content"] != "")
-    group_map = (
-        rules.loc[group_mask]
-        .drop_duplicates(subset=["error_code"], keep="last")
-        .set_index("error_code")["content"]
-    )
+    group_rules = rules.loc[
+        group_mask, ["error_code", "content", "group_label", "content_key"]
+    ].copy()
+    group_rules["content_len"] = group_rules["content_key"].str.len()
+    group_rules = group_rules.sort_values(["error_code", "content_len"], ascending=[True, False])
+    group_rules_by_code: dict[int, list[tuple[list[str], str]]] = {}
+    group_rules_any: list[tuple[list[str], str]] = []
+    for code, _content, label, keyword, _ in group_rules.itertuples(index=False, name=None):
+        if not keyword:
+            continue
+        keywords = _split_keywords(keyword)
+        if not keywords:
+            continue
+        if pd.isna(code):
+            group_rules_any.append((keywords, label))
+        else:
+            group_rules_by_code.setdefault(int(code), []).append((keywords, label))
 
-    if not group_map.empty:
-        df_out["内容分组"] = df_out["error_code"].map(group_map)
-        df_out["内容分组"] = df_out["内容分组"].fillna(df_out["内容"])
+    if group_rules_by_code or group_rules_any:
+        def _match_group(row: pd.Series) -> str:
+            rules_for_code = group_rules_by_code.get(row["error_code"])
+            if not rules_for_code:
+                rules_for_code = []
+            text = str(row["内容"]).lower()
+            for keywords, label in rules_for_code:
+                if any(key in text for key in keywords):
+                    return label
+            for keywords, label in group_rules_any:
+                if any(key in text for key in keywords):
+                    return label
+            return row["内容"]
+
+        df_out["内容分组"] = df_out.apply(_match_group, axis=1)
     else:
         df_out["内容分组"] = df_out["内容"]
 
     info = {
         "excluded_rows": int(len(df) - len(df_out)),
-        "grouped_codes": int(group_map.shape[0]),
+        "grouped_codes": int(group_rules.shape[0]),
     }
     return df_out, info
 
@@ -146,10 +191,39 @@ def main() -> None:
 
         topn = st.number_input("Top N 内容", min_value=3, max_value=20, value=5, step=1)
 
+        xaxis_mode = st.selectbox(
+            "图表维度",
+            options=["Action on X (Legend=Date)", "Date on X (Legend=Action)"],
+            index=0,
+        )
+
         rules_file = st.file_uploader(
-            "CSV规则（error_code, content, flag）",
+            "CSV规则（error_code, keyword, group_label, flag）",
             type=["csv"],
-            help="flag=exclude表示过滤；content用于按error_code分组显示。",
+            help="flag=exclude表示过滤；keyword用于匹配内容；group_label用于分组显示。",
+        )
+
+        rules_options = ["None", "Uploaded"]
+        if os.path.exists("MW_rules.csv"):
+            rules_options.append("MW_rules.csv")
+        if os.path.exists("SC_rules.csv"):
+            rules_options.append("SC_rules.csv")
+
+        mapped_rules = None
+        if selected_line in {"SPT1.1", "SPT1.2"} and "SC_rules.csv" in rules_options:
+            mapped_rules = "SC_rules.csv"
+        elif selected_line in {"SPT2.1", "SPT2.2"} and "MW_rules.csv" in rules_options:
+            mapped_rules = "MW_rules.csv"
+
+        default_rules_index = 1 if "Uploaded" in rules_options else 0
+        if mapped_rules in rules_options:
+            default_rules_index = rules_options.index(mapped_rules)
+
+        selected_rules = st.selectbox(
+            "规则文件选择",
+            options=rules_options,
+            index=default_rules_index,
+            help="选择用于过滤/分组的CSV；Uploaded优先使用上面上传的文件。",
         )
 
         refresh = st.button("手动刷新", help="清除缓存并重新从数据库拉取")
@@ -171,7 +245,13 @@ def main() -> None:
 
     dff = dff[(dff["date"] >= start_date) & (dff["date"] <= end_date)]
 
-    rules = _load_rules_csv(rules_file)
+    if "内容分组" in dff.columns:
+        dff = dff.drop(columns=["内容分组"])
+
+    rules_path = None
+    if selected_rules not in {"None", "Uploaded"}:
+        rules_path = selected_rules
+    rules = _load_rules_csv(rules_file if selected_rules == "Uploaded" else None, rules_path)
     dff, rules_info = _apply_csv_rules(dff, rules)
 
     if dff.empty:
@@ -205,22 +285,34 @@ def main() -> None:
     daily_top["date"] = pd.to_datetime(daily_top["date"])
     daily_top = daily_top.sort_values(["date", "occurance"], ascending=[True, False])
 
-    pivot_top = (
-        daily_top
-        .pivot_table(index=content_col, columns="date", values="occurance", aggfunc="sum", fill_value=0)
-        .sort_index()
-    )
-    pivot_top.columns = pd.to_datetime(pivot_top.columns).strftime("%Y-%m-%d")
+    if xaxis_mode == "Date on X (Legend=Action)":
+        pivot_top = (
+            daily_top
+            .pivot_table(index="date", columns=content_col, values="occurance", aggfunc="sum", fill_value=0)
+            .sort_index()
+        )
+        pivot_top.index = pd.to_datetime(pivot_top.index).strftime("%Y-%m-%d")
+        legend_title = content_col
+        x_label = "date"
+    else:
+        pivot_top = (
+            daily_top
+            .pivot_table(index=content_col, columns="date", values="occurance", aggfunc="sum", fill_value=0)
+            .sort_index()
+        )
+        pivot_top.columns = pd.to_datetime(pivot_top.columns).strftime("%Y-%m-%d")
+        legend_title = "date"
+        x_label = content_col
 
     fig, ax = plt.subplots(figsize=(10, 5))
     pivot_top.plot(kind="bar", stacked=False, ax=ax)
     for container in ax.containers:
         ax.bar_label(container, padding=2, fontsize=8)
     ax.set_title("Daily occurrences by Top 内容")
-    ax.set_xlabel(content_col)
+    ax.set_xlabel(x_label)
     ax.set_ylabel("occurance")
     ax.tick_params(axis="x", labelrotation=45)
-    ax.legend(title="date", bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.legend(title=legend_title, bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.tight_layout()
     st.pyplot(fig, use_container_width=True)
 

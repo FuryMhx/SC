@@ -1,0 +1,35 @@
+error_code,keyword,group_label,flag
+,不能找到Mark点!,camera cant find mark point ,include
+,Mark点上边宽度差,mark point distance,include
+,缺角,detected breakage,include
+,通讯超时|communication timeout,camera communication timeout,include
+,光幕|light curtain,light curtain interference,include
+,26,Wafer-in-Nest sensor blocked,include
+,光幕,door open,include
+,31CV1,CV1 Wafer input failed,include
+,32CV2,CV2 Wafer input failed,include
+,33CV3,CV3 Wafer input failed,include
+,34CV4,CV4 Wafer input failed,include
+,35CV5,CV5 Wafer input failed,include
+,56A,Table A change paper roll warning,include
+,57B,Table B change paper roll warning,include
+,58C,Table C change paper roll warning,include
+,59D,Table D change paper roll warning,include
+,出片,Out wafer detect screen break,include
+,后右门锁异常,Abnormal rear right door lock detection,include
+,安全门1异常,Security Gate 1 is abnormal,include
+,安全门2异常,Security Gate 2 is abnormal,include
+,A马达,Table A Motor out of moving range,include
+,B马达,Table B Motor out of moving range,include
+,C马达,Table C Motor out of moving range,include
+,D马达,Table D Motor out of moving range,include
+,相机组,action filter,exclude
+,SofeWare Start-up!,action filter,exclude
+,100,action filter,exclude
+,101,action filter,exclude
+,44,action filter,exclude
+,43,action filter,exclude
+,SuperManagerIdentity login !,action filter,exclude
+,超级管理员Identity login !,action filter,exclude
+,管理员退出登录!,action filter,exclude
+,需要重启软件恢复!,action filter,exclude

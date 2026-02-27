@@ -93,13 +93,12 @@ def transform_printer_summary(df_log: pd.DataFrame) -> dict:
 
     df_log_with_code['内容'] = df_log_with_code['内容'].apply(_ensure_text)
     df_log_with_code['error_code'] = df_log_with_code['内容'].str.extract(pattern, expand=False)
-
-    # Keep only rows that contain an error_code
-    df_log_errors = df_log_with_code.dropna(subset=['error_code']).copy()
-    df_log_errors['error_code'] = df_log_errors['error_code'].astype(int)
+    df_log_with_code['error_code'] = pd.to_numeric(
+        df_log_with_code['error_code'], errors='coerce'
+    ).astype('Int64')
 
     # Keep original columns and rename error_date -> date
-    df = df_log_errors[['error_date', 'printer_id', 'error_code', '内容', 'occurance']].copy()
+    df = df_log_with_code[['error_date', 'printer_id', 'error_code', '内容', 'occurance']].copy()
     df.rename(columns={'error_date': 'date'}, inplace=True)
 
     # Remove embedded error_code from 内容 and trim
