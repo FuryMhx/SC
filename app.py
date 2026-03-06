@@ -1,24 +1,13 @@
 import os
 from datetime import date
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.express as px
 import streamlit as st
 
 from log_processing import refresh_once
 
 
 st.set_page_config(page_title="Printer Errors Dashboard", layout="wide")
-
-# Ensure Chinese text renders in Matplotlib on Windows.
-plt.rcParams["font.sans-serif"] = [
-    "Microsoft YaHei",
-    "SimHei",
-    "PingFang SC",
-    "Noto Sans CJK SC",
-    "Arial Unicode MS",
-]
-plt.rcParams["axes.unicode_minus"] = False
-
 
 @st.cache_data(ttl=600)
 def load_data() -> dict:
@@ -45,19 +34,25 @@ def _load_rules_csv(uploaded_file, selected_path: str | None) -> pd.DataFrame:
         st.warning("CSV缺少error_code列，已忽略该文件。")
         return pd.DataFrame()
 
-    if "content" not in rules.columns:
-        rules["content"] = ""
     if "keyword" in rules.columns:
-        rules["content"] = rules["keyword"].fillna("")
+        rules["keyword"] = rules["keyword"].fillna("")
+        if "group_label" not in rules.columns:
+            rules["group_label"] = rules.get("content", "").fillna("")
+    else:
+        # Legacy CSVs may only have "content" as the display label.
+        rules["keyword"] = ""
+        if "group_label" not in rules.columns:
+            rules["group_label"] = rules.get("content", "").fillna("")
+
     if "group_label" in rules.columns:
         rules["group_label"] = rules["group_label"].fillna("")
     else:
-        rules["group_label"] = rules["content"].fillna("")
+        rules["group_label"] = ""
     if "flag" not in rules.columns:
         rules["flag"] = ""
 
-    rules = rules[["error_code", "content", "group_label", "flag"]].copy()
-    rules["content"] = rules["content"].fillna("")
+    rules = rules[["error_code", "keyword", "group_label", "flag"]].copy()
+    rules["keyword"] = rules["keyword"].fillna("")
     rules["group_label"] = rules["group_label"].fillna("")
     rules["flag"] = rules["flag"].fillna("")
     return rules
@@ -73,17 +68,17 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
     rules = rules.copy()
     rules["error_code"] = pd.to_numeric(rules["error_code"], errors="coerce")
     rules["error_code"] = rules["error_code"].astype("Int64")
-    rules["content"] = rules["content"].astype(str).str.strip()
+    rules["keyword"] = rules["keyword"].astype(str).str.strip()
     rules["group_label"] = rules["group_label"].astype(str).str.strip()
     rules["flag"] = rules["flag"].astype(str).str.lower().str.strip()
-    rules["content_key"] = rules["content"].str.lower()
+    rules["keyword_key"] = rules["keyword"].str.lower()
 
     exclude_flags = {"exclude", "x", "0", "false", "no", "drop", "remove"}
     exclude_mask = rules["flag"].isin(exclude_flags)
 
     exclude_codes = set(
         rules.loc[
-            exclude_mask & (rules["content"] == "") & rules["error_code"].notna(),
+            exclude_mask & (rules["keyword"] == "") & rules["error_code"].notna(),
             "error_code",
         ].tolist()
     )
@@ -93,7 +88,7 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
         df_out = df_out.loc[~drop_mask].copy()
 
     exclude_rules = rules.loc[
-        exclude_mask & (rules["content"] != ""), ["error_code", "content_key"]
+        exclude_mask & (rules["keyword"] != ""), ["error_code", "keyword_key"]
     ]
     if not exclude_rules.empty:
         content_key = df_out["内容"].astype(str).str.lower()
@@ -111,18 +106,22 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
                     drop_mask |= code_mask & content_key.str.contains(key, na=False)
         df_out = df_out.loc[~drop_mask].copy()
 
-    group_mask = (~exclude_mask) & (rules["content"] != "")
+    group_mask = (~exclude_mask) & (rules["group_label"] != "")
     group_rules = rules.loc[
-        group_mask, ["error_code", "content", "group_label", "content_key"]
+        group_mask, ["error_code", "keyword", "group_label", "keyword_key"]
     ].copy()
-    group_rules["content_len"] = group_rules["content_key"].str.len()
-    group_rules = group_rules.sort_values(["error_code", "content_len"], ascending=[True, False])
+    group_rules["keyword_len"] = group_rules["keyword_key"].str.len()
+    group_rules = group_rules.sort_values(["error_code", "keyword_len"], ascending=[True, False])
     group_rules_by_code: dict[int, list[tuple[list[str], str]]] = {}
     group_rules_any: list[tuple[list[str], str]] = []
-    for code, _content, label, keyword, _ in group_rules.itertuples(index=False, name=None):
-        if not keyword:
+    group_labels_by_code: dict[int, str] = {}
+    for code, keyword, label, keyword_key, _ in group_rules.itertuples(index=False, name=None):
+        if pd.notna(code) and not keyword:
+            group_labels_by_code[int(code)] = label
             continue
-        keywords = _split_keywords(keyword)
+        if not keyword_key:
+            continue
+        keywords = _split_keywords(keyword_key)
         if not keywords:
             continue
         if pd.isna(code):
@@ -130,8 +129,10 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
         else:
             group_rules_by_code.setdefault(int(code), []).append((keywords, label))
 
-    if group_rules_by_code or group_rules_any:
+    if group_rules_by_code or group_rules_any or group_labels_by_code:
         def _match_group(row: pd.Series) -> str:
+            if row["error_code"] in group_labels_by_code:
+                return group_labels_by_code[row["error_code"]]
             rules_for_code = group_rules_by_code.get(row["error_code"])
             if not rules_for_code:
                 rules_for_code = []
@@ -286,35 +287,37 @@ def main() -> None:
     daily_top = daily_top.sort_values(["date", "occurance"], ascending=[True, False])
 
     if xaxis_mode == "Date on X (Legend=Action)":
-        pivot_top = (
-            daily_top
-            .pivot_table(index="date", columns=content_col, values="occurance", aggfunc="sum", fill_value=0)
-            .sort_index()
+        plot_df = daily_top.copy()
+        plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.strftime("%Y-%m-%d")
+        fig = px.bar(
+            plot_df,
+            x="date",
+            y="occurance",
+            color=content_col,
+            barmode="group",
+            title="Occurrences b",
         )
-        pivot_top.index = pd.to_datetime(pivot_top.index).strftime("%Y-%m-%d")
-        legend_title = content_col
-        x_label = "date"
+        fig.update_layout(xaxis_title="date", legend_title_text=content_col)
     else:
-        pivot_top = (
-            daily_top
-            .pivot_table(index=content_col, columns="date", values="occurance", aggfunc="sum", fill_value=0)
-            .sort_index()
+        plot_df = daily_top.copy()
+        plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.strftime("%Y-%m-%d")
+        fig = px.bar(
+            plot_df,
+            x=content_col,
+            y="occurance",
+            color="date",
+            barmode="group",
+            title=f"Top {int(topn)} {content_col} by occurance",
         )
-        pivot_top.columns = pd.to_datetime(pivot_top.columns).strftime("%Y-%m-%d")
-        legend_title = "date"
-        x_label = content_col
+        fig.update_layout(xaxis_title=content_col, legend_title_text="date")
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    pivot_top.plot(kind="bar", stacked=False, ax=ax)
-    for container in ax.containers:
-        ax.bar_label(container, padding=2, fontsize=8)
-    ax.set_title("Daily occurrences by Top 内容")
-    ax.set_xlabel(x_label)
-    ax.set_ylabel("occurance")
-    ax.tick_params(axis="x", labelrotation=45)
-    ax.legend(title=legend_title, bbox_to_anchor=(1.02, 1), loc="upper left")
-    fig.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    fig.update_layout(
+        yaxis_title="occurance",
+        legend=dict(orientation="v", x=1.02, y=1),
+        font=dict(family="Microsoft YaHei, SimHei, Arial Unicode MS"),
+        margin=dict(r=200),
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("明细（可导出）")
     st.dataframe(
