@@ -1,0 +1,21 @@
+name: Rename "test" branch to "old-version"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rename-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rename branch test → old-version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/branches/test/rename \
+            -f new_name="old-version"
