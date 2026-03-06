@@ -1,4 +1,4 @@
-name: Rename "test" branch to "old-version"
+name: Rename test branch to old-version
 
 on:
   workflow_dispatch:
@@ -10,12 +10,18 @@ jobs:
   rename-branch:
     runs-on: ubuntu-latest
     steps:
-      - name: Rename branch test → old-version
+      - name: Rename branch test to old-version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/branches/test/rename \
-            -f new_name="old-version"
+          if gh api /repos/${{ github.repository }}/branches/test > /dev/null 2>&1; then
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              /repos/${{ github.repository }}/branches/test/rename \
+              -f new_name="old-version"
+            echo "Branch 'test' successfully renamed to 'old-version'."
+          else
+            echo "Branch 'test' not found. It may have already been renamed."
+            exit 1
+          fi
