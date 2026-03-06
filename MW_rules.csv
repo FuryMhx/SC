@@ -25,8 +25,9 @@ error_code,keyword,group_label,flag
 ,D马达,Table D Motor out of moving range,include
 ,相机组,action filter,exclude
 ,SofeWare Start-up!,action filter,exclude
-,100,action filter,exclude
-,101,action filter,exclude
+,状态切换,action filter,exclude
+,Change status,action filter,exclude
+,卷纸旋钮,action filter,exclude
 ,44,action filter,exclude
 ,43,action filter,exclude
 ,SuperManagerIdentity login !,action filter,exclude

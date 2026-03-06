@@ -2,3 +2,7 @@ error_code,content,flag
 527,downstream network communication failure,include
 589,,exclude
 337,abnormal wafer,include
+571,downstream not asked for slice,include
+565,paper nest change,include
+592,waiting for upstream wafer,include
+248,
