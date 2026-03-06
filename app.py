@@ -45,19 +45,25 @@ def _load_rules_csv(uploaded_file, selected_path: str | None) -> pd.DataFrame:
         st.warning("CSV缺少error_code列，已忽略该文件。")
         return pd.DataFrame()
 
-    if "content" not in rules.columns:
-        rules["content"] = ""
     if "keyword" in rules.columns:
-        rules["content"] = rules["keyword"].fillna("")
+        rules["keyword"] = rules["keyword"].fillna("")
+        if "group_label" not in rules.columns:
+            rules["group_label"] = rules.get("content", "").fillna("")
+    else:
+        # Legacy CSVs may only have "content" as the display label.
+        rules["keyword"] = ""
+        if "group_label" not in rules.columns:
+            rules["group_label"] = rules.get("content", "").fillna("")
+
     if "group_label" in rules.columns:
         rules["group_label"] = rules["group_label"].fillna("")
     else:
-        rules["group_label"] = rules["content"].fillna("")
+        rules["group_label"] = ""
     if "flag" not in rules.columns:
         rules["flag"] = ""
 
-    rules = rules[["error_code", "content", "group_label", "flag"]].copy()
-    rules["content"] = rules["content"].fillna("")
+    rules = rules[["error_code", "keyword", "group_label", "flag"]].copy()
+    rules["keyword"] = rules["keyword"].fillna("")
     rules["group_label"] = rules["group_label"].fillna("")
     rules["flag"] = rules["flag"].fillna("")
     return rules
@@ -73,17 +79,17 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
     rules = rules.copy()
     rules["error_code"] = pd.to_numeric(rules["error_code"], errors="coerce")
     rules["error_code"] = rules["error_code"].astype("Int64")
-    rules["content"] = rules["content"].astype(str).str.strip()
+    rules["keyword"] = rules["keyword"].astype(str).str.strip()
     rules["group_label"] = rules["group_label"].astype(str).str.strip()
     rules["flag"] = rules["flag"].astype(str).str.lower().str.strip()
-    rules["content_key"] = rules["content"].str.lower()
+    rules["keyword_key"] = rules["keyword"].str.lower()
 
     exclude_flags = {"exclude", "x", "0", "false", "no", "drop", "remove"}
     exclude_mask = rules["flag"].isin(exclude_flags)
 
     exclude_codes = set(
         rules.loc[
-            exclude_mask & (rules["content"] == "") & rules["error_code"].notna(),
+            exclude_mask & (rules["keyword"] == "") & rules["error_code"].notna(),
             "error_code",
         ].tolist()
     )
@@ -93,7 +99,7 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
         df_out = df_out.loc[~drop_mask].copy()
 
     exclude_rules = rules.loc[
-        exclude_mask & (rules["content"] != ""), ["error_code", "content_key"]
+        exclude_mask & (rules["keyword"] != ""), ["error_code", "keyword_key"]
     ]
     if not exclude_rules.empty:
         content_key = df_out["内容"].astype(str).str.lower()
@@ -111,18 +117,22 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
                     drop_mask |= code_mask & content_key.str.contains(key, na=False)
         df_out = df_out.loc[~drop_mask].copy()
 
-    group_mask = (~exclude_mask) & (rules["content"] != "")
+    group_mask = (~exclude_mask) & (rules["group_label"] != "")
     group_rules = rules.loc[
-        group_mask, ["error_code", "content", "group_label", "content_key"]
+        group_mask, ["error_code", "keyword", "group_label", "keyword_key"]
     ].copy()
-    group_rules["content_len"] = group_rules["content_key"].str.len()
-    group_rules = group_rules.sort_values(["error_code", "content_len"], ascending=[True, False])
+    group_rules["keyword_len"] = group_rules["keyword_key"].str.len()
+    group_rules = group_rules.sort_values(["error_code", "keyword_len"], ascending=[True, False])
     group_rules_by_code: dict[int, list[tuple[list[str], str]]] = {}
     group_rules_any: list[tuple[list[str], str]] = []
-    for code, _content, label, keyword, _ in group_rules.itertuples(index=False, name=None):
-        if not keyword:
+    group_labels_by_code: dict[int, str] = {}
+    for code, keyword, label, keyword_key, _ in group_rules.itertuples(index=False, name=None):
+        if pd.notna(code) and not keyword:
+            group_labels_by_code[int(code)] = label
             continue
-        keywords = _split_keywords(keyword)
+        if not keyword_key:
+            continue
+        keywords = _split_keywords(keyword_key)
         if not keywords:
             continue
         if pd.isna(code):
@@ -130,8 +140,10 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
         else:
             group_rules_by_code.setdefault(int(code), []).append((keywords, label))
 
-    if group_rules_by_code or group_rules_any:
+    if group_rules_by_code or group_rules_any or group_labels_by_code:
         def _match_group(row: pd.Series) -> str:
+            if row["error_code"] in group_labels_by_code:
+                return group_labels_by_code[row["error_code"]]
             rules_for_code = group_rules_by_code.get(row["error_code"])
             if not rules_for_code:
                 rules_for_code = []
