@@ -1,7 +1,7 @@
 import os
 from datetime import date
 import pandas as pd
-import plotly.express as px
+import matplotlib.pyplot as plt
 import streamlit as st
 
 from log_processing import refresh_once
@@ -286,38 +286,48 @@ def main() -> None:
     daily_top["date"] = pd.to_datetime(daily_top["date"])
     daily_top = daily_top.sort_values(["date", "occurance"], ascending=[True, False])
 
-    if xaxis_mode == "Date on X (Legend=Action)":
-        plot_df = daily_top.copy()
-        plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.strftime("%Y-%m-%d")
-        fig = px.bar(
-            plot_df,
-            x="date",
-            y="occurance",
-            color=content_col,
-            barmode="group",
-            title="Occurrences b",
-        )
-        fig.update_layout(xaxis_title="date", legend_title_text=content_col)
-    else:
-        plot_df = daily_top.copy()
-        plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.strftime("%Y-%m-%d")
-        fig = px.bar(
-            plot_df,
-            x=content_col,
-            y="occurance",
-            color="date",
-            barmode="group",
-            title=f"Top {int(topn)} {content_col} by occurance",
-        )
-        fig.update_layout(xaxis_title=content_col, legend_title_text="date")
+    plot_df = daily_top.copy()
+    plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.strftime("%Y-%m-%d")
 
-    fig.update_layout(
-        yaxis_title="occurance",
-        legend=dict(orientation="v", x=1.02, y=1),
-        font=dict(family="Microsoft YaHei, SimHei, Arial Unicode MS"),
-        margin=dict(r=200),
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    plt.rcParams["font.family"] = ["Microsoft YaHei", "SimHei", "Arial Unicode MS", "sans-serif"]
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    if xaxis_mode == "Date on X (Legend=Action)":
+        pivot = plot_df.pivot_table(
+            index="date",
+            columns=content_col,
+            values="occurance",
+            aggfunc="sum",
+            fill_value=0,
+        )
+        pivot.plot(kind="bar", ax=ax)
+        ax.set_xlabel("date")
+        ax.legend(title=content_col, bbox_to_anchor=(1.02, 1), loc="upper left")
+        ax.set_title(
+            f"Top {int(topn)} {content_col} of {selected_printer} from {start_date} to {end_date}"
+        )
+    else:
+        pivot = plot_df.pivot_table(
+            index=content_col,
+            columns="date",
+            values="occurance",
+            aggfunc="sum",
+            fill_value=0,
+        )
+        pivot.plot(kind="bar", ax=ax)
+        ax.set_xlabel(content_col)
+        ax.legend(title="date", bbox_to_anchor=(1.02, 1), loc="upper left")
+        ax.set_title(
+            f"Top {int(topn)} {content_col} of {selected_printer} from {start_date} to {end_date}"
+        )
+
+    ax.set_ylabel("occurance")
+    for label in ax.get_xticklabels():
+        label.set_rotation(30)
+        label.set_ha("right")
+    fig.subplots_adjust(bottom=0.25)
+    fig.tight_layout(rect=[0, 0, 0.85, 1])
+    st.pyplot(fig, use_container_width=True)
 
     st.subheader("明细（可导出）")
     st.dataframe(

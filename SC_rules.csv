@@ -5,4 +5,5 @@ error_code,content,flag
 571,downstream not asked for slice,include
 565,paper nest change,include
 592,waiting for upstream wafer,include
-248,
+523,disable outboard camera,include
+246,inboard wafer breakages,include
