@@ -7,18 +7,21 @@ import streamlit as st
 from log_processing import refresh_once
 
 
-st.set_page_config(page_title="Printer Errors Dashboard", layout="wide")
+st.set_page_config(page_title="Machine Alarm Dashboard", layout="wide")
 
 @st.cache_data(ttl=600)
 def load_data() -> dict:
-    # 从PostgreSQL拉取并做清洗（复用你现有逻辑）
+    # 从MariaDB拉取并做清洗（复用你现有逻辑）
     return refresh_once(print_status=False)
 
 
 def _add_line_column(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-    # printer_id: SPT1.1_xxx / SPT1.2_xxx
-    out["line"] = out["printer_id"].astype(str).str.extract(r"^(SPT\d+\.\d+)", expand=False)
+    if "line_id" in out.columns:
+        out["line"] = out["line_id"].astype(str)
+    else:
+        # machine_id: SPT1.1_xxx / SPT1.2_xxx
+        out["line"] = out["machine_id"].astype(str).str.extract(r"^(SPT\d+\.\d+)", expand=False)
     return out
 
 
@@ -157,10 +160,10 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
 
 
 def main() -> None:
-    st.title("Printer Error Dashboard")
+    st.title("Machine Alarm Dashboard")
 
     data = load_data()
-    df = data["df"].copy()  # columns: date, printer_id, error_code, 内容, occurance
+    df = data["df"].copy()  # columns: date, line_id, machine_id, error_code, 内容, occurance
     if df.empty:
         st.warning("没有查询到数据（df为空）。请检查数据库连接/表数据。")
         st.stop()
@@ -176,8 +179,8 @@ def main() -> None:
         selected_line = st.selectbox("产线", options=line_options, index=0)
 
         df_for_printers = df if selected_line == "All" else df[df["line"] == selected_line]
-        printer_options = ["All"] + sorted(df_for_printers["printer_id"].unique().tolist())
-        selected_printer = st.selectbox("Printer", options=printer_options, index=0)
+        machine_options = ["All"] + sorted(df_for_printers["machine_id"].unique().tolist())
+        selected_machine = st.selectbox("Machine", options=machine_options, index=0)
 
         min_date = df_for_printers["date"].min()
         max_date = df_for_printers["date"].max()
@@ -241,8 +244,8 @@ def main() -> None:
         end_date = date_range
 
     dff = df_for_printers.copy()
-    if selected_printer != "All":
-        dff = dff[dff["printer_id"] == selected_printer]
+    if selected_machine != "All":
+        dff = dff[dff["machine_id"] == selected_machine]
 
     dff = dff[(dff["date"] >= start_date) & (dff["date"] <= end_date)]
 
@@ -261,7 +264,10 @@ def main() -> None:
 
     # ---- Metrics ----
     total_occ = int(dff["occurance"].sum())
-    st.caption(f"数据来源：PostgreSQL（PGHOST={os.getenv('PGHOST', '10.1.3.102')}），当前筛选总occurance={total_occ}")
+    st.caption(
+        "数据来源：MariaDB"
+        f"（MARIADB_HOST={os.getenv('MARIADB_HOST', '127.0.0.1')}），当前筛选总occurance={total_occ}"
+    )
     if rules_info:
         st.caption(
             f"CSV规则：过滤{rules_info['excluded_rows']}行；分组{rules_info['grouped_codes']}个error_code。"

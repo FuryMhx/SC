@@ -14,3 +14,4 @@ plotly==5.24.*
 # Streamlit uses Arrow for DataFrame transport; ensure a working wheel is installed.
 pyarrow==19.0.*
 matplotlib==3.9.*  # For any plotting needs beyond Plotly
+pymysql==1.1.*  # MariaDB/MySQL driver

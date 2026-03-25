@@ -1,0 +1,33 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "SQL",
+            "database": "demo",
+            "username": "admin",
+            "password": ""
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "192.168.3.139",
+            "port": 3306,
+            "driver": "MariaDB",
+            "name": "TEST",
+            "database": "machine_status_db",
+            "username": "sorterbin",
+            "password": "sorterbin123"
+        }
+    ]
+}
