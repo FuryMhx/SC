@@ -292,6 +292,10 @@ def main() -> None:
     daily_top["date"] = pd.to_datetime(daily_top["date"])
     daily_top = daily_top.sort_values(["date", "occurance"], ascending=[True, False])
 
+    date_range_label = f"{start_date} to {end_date}"
+    machine_label = selected_machine
+    title_suffix = f" | Machine: {machine_label} | Dates: {date_range_label}"
+
     if xaxis_mode == "Date on X (Legend=Action)":
         plot_df = daily_top.copy()
         plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.strftime("%Y-%m-%d")
@@ -301,7 +305,7 @@ def main() -> None:
             y="occurance",
             color=content_col,
             barmode="group",
-            title="Occurrences b",
+            title=f"Occurrences{title_suffix}",
         )
         fig.update_layout(xaxis_title="date", legend_title_text=content_col)
     else:
@@ -313,7 +317,7 @@ def main() -> None:
             y="occurance",
             color="date",
             barmode="group",
-            title=f"Top {int(topn)} {content_col} by occurance",
+            title=f"Top {int(topn)} {content_col} by occurance{title_suffix}",
         )
         fig.update_layout(xaxis_title=content_col, legend_title_text="date")
 
