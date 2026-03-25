@@ -7,7 +7,7 @@ import streamlit as st
 from log_processing import refresh_once
 
 
-st.set_page_config(page_title="Machine Alarm Dashboard", layout="wide")
+st.set_page_config(page_title="Tester Alarm Dashboard", layout="wide")
 
 @st.cache_data(ttl=600)
 def load_data() -> dict:
@@ -160,7 +160,7 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
 
 
 def main() -> None:
-    st.title("Machine Alarm Dashboard")
+    st.title("Tester Alarm Dashboard")
 
     data = load_data()
     df = data["df"].copy()  # columns: date, line_id, machine_id, error_code, 内容, occurance
@@ -248,6 +248,8 @@ def main() -> None:
         dff = dff[dff["machine_id"] == selected_machine]
 
     dff = dff[(dff["date"] >= start_date) & (dff["date"] <= end_date)]
+
+    dff = dff[~dff["内容"].astype(str).str.contains("备用", na=False)].copy()
 
     if "内容分组" in dff.columns:
         dff = dff.drop(columns=["内容分组"])
