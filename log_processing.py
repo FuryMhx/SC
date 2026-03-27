@@ -9,24 +9,33 @@ import pandas as pd
 import pymysql
 
 DEFAULT_QUERY = """
-SELECT
-    DATE(A.start_time) AS date,
-    A.alarm_codes AS error_code,
-    L.alarm_cn AS 内容,
-    A.line_id AS line_id,
-    A.machine AS machine,
-    COUNT(*) AS occurance
-FROM tester_alarm A
-JOIN tester_alarm_list L ON A.alarm_codes = L.alarm_code
-GROUP BY
-    DATE(A.start_time),
-    A.alarm_codes,
-    L.alarm_cn,
+WITH AggregatedAlarms AS (
+    SELECT
+        DATE(start_time) AS date,
+        alarm_codes AS error_code,
+        line_id,
+        machine,
+        COUNT(*) AS occurance
+    FROM tester_alarm
+    -- A WHERE clause should go here (see point 2)
+    GROUP BY
+        DATE(start_time),
+        line_id, 
+        machine,
+        alarm_codes       
+       
+)
+SELECT 
+    A.date,
     A.line_id,
-    A.machine
-ORDER BY
-    DATE(A.start_time) DESC,
-    COUNT(*) DESC
+    A.machine,
+    A.error_code,
+    L.alarm_cn AS 内容,
+    A.occurance
+FROM AggregatedAlarms A
+LEFT JOIN tester_alarm_list L 
+    ON A.error_code = L.alarm_code 
+    AND A.machine = L.machine;
 """
 
 
@@ -111,7 +120,7 @@ def _normalize_alarm_df(df_log: pd.DataFrame) -> pd.DataFrame:
     if resolved["occurance"] is not None:
         df = df.rename(columns={resolved["occurance"]: "occurance"})
     else:
-        df["occurance"] = 1
+        df["occurance"] = 0
 
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df["内容"] = df["内容"].apply(_ensure_text)
