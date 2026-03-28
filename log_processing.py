@@ -35,9 +35,6 @@ GROUP BY
     时间::DATE,   -- You must group by the converted date
     printer_id, 
     内容
-ORDER BY 
-    error_date DESC, 
-    occurance DESC;
 '''
 
 

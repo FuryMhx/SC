@@ -267,6 +267,33 @@ def main() -> None:
             f"CSV规则：过滤{rules_info['excluded_rows']}行；分组{rules_info['grouped_codes']}个error_code。"
         )
 
+    date_range_label = f"{start_date} to {end_date}"
+    printer_label = selected_printer
+    title_suffix = f" | Machine: {printer_label} | Dates: {date_range_label}"
+
+    content_col = "内容分组" if "内容分组" in dff.columns else "内容"
+    st.subheader(f"日期范围内 {content_col} 总数（occurance）")
+    total_content = (
+        dff.groupby(content_col, as_index=False)["occurance"].sum()
+        .sort_values("occurance", ascending=False)
+    )
+    total_content = total_content.head(int(topn))
+    total_fig = px.bar(
+        total_content,
+        x=content_col,
+        y="occurance",
+        text="occurance",
+        title=f"Top {int(topn)} Total occurance by {content_col}{title_suffix}",
+    )
+    total_fig.update_layout(
+        xaxis_title=content_col,
+        yaxis_title="occurance",
+        font=dict(family="Microsoft YaHei, SimHei, Arial Unicode MS"),
+    )
+    total_fig.update_traces(textposition="outside", cliponaxis=False)
+    st.plotly_chart(total_fig, use_container_width=True)
+    
+
     # ---- Chart: daily occurrences split by Top N 内容 ----
     st.subheader(f"按天 Top {int(topn)} 内容（occurance）")
 
@@ -297,9 +324,10 @@ def main() -> None:
             plot_df,
             x="date",
             y="occurance",
+            text = 'occurance',
             color=content_col,
             barmode="group",
-            title=f"Occurrences{title_suffix}",
+            title=f"Occurrences{title_suffix}"
         )
         fig.update_layout(xaxis_title="date", legend_title_text=content_col)
     else:
@@ -309,9 +337,10 @@ def main() -> None:
             plot_df,
             x=content_col,
             y="occurance",
+            text = 'occurance',
             color="date",
             barmode="group",
-            title=f"Top {int(topn)} {content_col} by occurance{title_suffix}",
+            title=f"Top {int(topn)} {content_col} by occurance{title_suffix}"
         )
         fig.update_layout(xaxis_title=content_col, legend_title_text="date")
 
@@ -321,6 +350,7 @@ def main() -> None:
         font=dict(family="Microsoft YaHei, SimHei, Arial Unicode MS"),
         margin=dict(r=200),
     )
+    fig.update_traces(textposition="outside", cliponaxis=False)
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("明细（可导出）")
