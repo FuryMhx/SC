@@ -289,10 +289,44 @@ def main() -> None:
         xaxis_title=content_col,
         yaxis_title="occurance",
         font=dict(family="Microsoft YaHei, SimHei, Arial Unicode MS"),
+        clickmode="event+select",
     )
     total_fig.update_traces(textposition="outside", cliponaxis=False)
-    st.plotly_chart(total_fig, use_container_width=True)
-    
+    total_event = st.plotly_chart(
+        total_fig, use_container_width=True, on_select="rerun",
+        selection_mode=("points",), key="total_chart",
+    )
+
+    # ---- Drill-down: daily bars for selected category ----
+    selected_category = None
+    if total_event and total_event.selection and total_event.selection.points:
+        pt = total_event.selection.points[0]
+        selected_category = pt.get("x", None)
+
+
+    if selected_category:
+        st.subheader(f"Daily Breakdown: {selected_category}")
+        daily_selected = (
+            dff[dff[content_col] == selected_category]
+            .groupby("date", as_index=False)["occurance"].sum()
+        )
+        daily_selected["date"] = pd.to_datetime(daily_selected["date"])
+        daily_selected = daily_selected.sort_values("date")
+        daily_selected["date_str"] = daily_selected["date"].dt.strftime("%Y-%m-%d")
+        drill_fig = px.bar(
+            daily_selected,
+            x="date_str",
+            y="occurance",
+            text="occurance",
+            title=f"Daily occurrences: {selected_category}{title_suffix}",
+        )
+        drill_fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="occurance",
+            font=dict(family="Microsoft YaHei, SimHei, Arial Unicode MS"),
+        )
+        drill_fig.update_traces(textposition="outside", cliponaxis=False)
+        st.plotly_chart(drill_fig, use_container_width=True)
 
     # ---- Chart: daily occurrences split by Top N 内容 ----
     st.subheader(f"按天 Top {int(topn)} 内容（occurance）")
