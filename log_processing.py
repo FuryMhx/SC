@@ -30,7 +30,7 @@ SELECT
     A.line_id,
     A.machine,
     A.error_code,
-    L.alarm_cn AS 内容,
+    L.alarm_en AS content,
     A.occurance
 FROM AggregatedAlarms A
 LEFT JOIN tester_alarm_list L 
@@ -85,7 +85,7 @@ def _normalize_alarm_df(df_log: pd.DataFrame) -> pd.DataFrame:
     col_date = os.getenv("ALARM_COL_DATE", "date")
     col_machine = os.getenv("ALARM_COL_MACHINE", "machine")
     col_code = os.getenv("ALARM_COL_CODE", "error_code")
-    col_message = os.getenv("ALARM_COL_MESSAGE", "内容")
+    col_message = os.getenv("ALARM_COL_MESSAGE", "content")
     col_line = os.getenv("ALARM_COL_LINE", "line_id")
     col_occ = os.getenv("ALARM_COL_OCCURANCE", "occurance")
 
@@ -93,7 +93,7 @@ def _normalize_alarm_df(df_log: pd.DataFrame) -> pd.DataFrame:
         "date": _resolve_column(df_log, col_date),
         "machine_id": _resolve_column(df_log, col_machine),
         "error_code": _resolve_column(df_log, col_code),
-        "内容": _resolve_column(df_log, col_message),
+        "content": _resolve_column(df_log, col_message),
         "line_id": _resolve_column(df_log, col_line),
         "occurance": _resolve_column(df_log, col_occ) if col_occ else None,
     }
@@ -112,7 +112,7 @@ def _normalize_alarm_df(df_log: pd.DataFrame) -> pd.DataFrame:
             resolved["date"]: "date",
             resolved["machine_id"]: "machine_id",
             resolved["error_code"]: "error_code",
-            resolved["内容"]: "内容",
+            resolved["content"]: "content",
             resolved["line_id"]: "line_id",
         }
     ).copy()
@@ -123,12 +123,12 @@ def _normalize_alarm_df(df_log: pd.DataFrame) -> pd.DataFrame:
         df["occurance"] = 0
 
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["内容"] = df["内容"].apply(_ensure_text)
+    df["content"] = df["content"].apply(_ensure_text)
     df["error_code"] = pd.to_numeric(df["error_code"], errors="coerce").astype("Int64")
     df["machine_id"] = df["machine_id"].astype(str)
     df["line_id"] = df["line_id"].astype(str)
 
-    return df[["date", "line_id", "machine_id", "error_code", "内容", "occurance"]].copy()
+    return df[["date", "line_id", "machine_id", "error_code", "content", "occurance"]].copy()
 
 
 def transform_printer_summary(df_log: pd.DataFrame) -> dict:

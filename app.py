@@ -11,7 +11,7 @@ st.set_page_config(page_title="Tester Alarm Dashboard", layout="wide")
 
 @st.cache_data(ttl=600)
 def load_data() -> dict:
-    # 从MariaDB拉取并做清洗（复用你现有逻辑）
+    # Fetch from MariaDB and clean (reuse existing logic)
     return refresh_once(print_status=False)
 
 
@@ -34,7 +34,7 @@ def _load_rules_csv(uploaded_file, selected_path: str | None) -> pd.DataFrame:
         return pd.DataFrame()
     rules.columns = [str(col).strip().lower() for col in rules.columns]
     if "error_code" not in rules.columns:
-        st.warning("CSV缺少error_code列，已忽略该文件。")
+        st.warning("CSV is missing 'error_code' column; file ignored.")
         return pd.DataFrame()
 
     if "keyword" in rules.columns:
@@ -94,7 +94,7 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
         exclude_mask & (rules["keyword"] != ""), ["error_code", "keyword_key"]
     ]
     if not exclude_rules.empty:
-        content_key = df_out["内容"].astype(str).str.lower()
+        content_key = df_out["content"].astype(str).str.lower()
         drop_mask = pd.Series(False, index=df_out.index)
         for code, keyword in exclude_rules.itertuples(index=False, name=None):
             if not keyword:
@@ -139,18 +139,18 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
             rules_for_code = group_rules_by_code.get(row["error_code"])
             if not rules_for_code:
                 rules_for_code = []
-            text = str(row["内容"]).lower()
+            text = str(row["content"]).lower()
             for keywords, label in rules_for_code:
                 if any(key in text for key in keywords):
                     return label
             for keywords, label in group_rules_any:
                 if any(key in text for key in keywords):
                     return label
-            return row["内容"]
+            return row["content"]
 
-        df_out["内容分组"] = df_out.apply(_match_group, axis=1)
+        df_out["content_group"] = df_out.apply(_match_group, axis=1)
     else:
-        df_out["内容分组"] = df_out["内容"]
+        df_out["content_group"] = df_out["content"]
 
     info = {
         "excluded_rows": int(len(df) - len(df_out)),
@@ -163,9 +163,9 @@ def main() -> None:
     st.title("Tester Alarm Dashboard")
 
     data = load_data()
-    df = data["df"].copy()  # columns: date, line_id, machine_id, error_code, 内容, occurance
+    df = data["df"].copy()  # columns: date, line_id, machine_id, error_code, content, occurance
     if df.empty:
-        st.warning("没有查询到数据（df为空）。请检查数据库连接/表数据。")
+        st.warning("No data returned (df is empty). Please check DB connection / table data.")
         st.stop()
 
     df = _add_line_column(df)
@@ -173,10 +173,10 @@ def main() -> None:
 
     # ---- Sidebar filters ----
     with st.sidebar:
-        st.header("筛选")
+        st.header("Filters")
 
         line_options = ["All"] + sorted([x for x in df["line"].dropna().unique().tolist()])
-        selected_line = st.selectbox("产线", options=line_options, index=0)
+        selected_line = st.selectbox("Line", options=line_options, index=0)
 
         df_for_printers = df if selected_line == "All" else df[df["line"] == selected_line]
         machine_options = ["All"] + sorted(df_for_printers["machine_id"].unique().tolist())
@@ -187,24 +187,24 @@ def main() -> None:
         today = date.today()
         default_date = min(max(today, min_date), max_date)
         date_range = st.date_input(
-            "日期范围",
+            "Date Range",
             value=(default_date, default_date),
             min_value=min_date,
             max_value=max_date,
         )
 
-        topn = st.number_input("Top N 内容", min_value=3, max_value=20, value=5, step=1)
+        topn = st.number_input("Top N Content", min_value=3, max_value=20, value=5, step=1)
 
         xaxis_mode = st.selectbox(
-            "图表维度",
+            "Chart Dimension",
             options=["Action on X (Legend=Date)", "Date on X (Legend=Action)"],
             index=0,
         )
 
         rules_file = st.file_uploader(
-            "CSV规则（error_code, keyword, group_label, flag）",
+            "CSV Rules (error_code, keyword, group_label, flag)",
             type=["csv"],
-            help="flag=exclude表示过滤；keyword用于匹配内容；group_label用于分组显示。",
+            help="flag=exclude to filter; keyword to match content; group_label for grouping display.",
         )
 
         rules_options = ["None", "Uploaded"]
@@ -224,13 +224,13 @@ def main() -> None:
             default_rules_index = rules_options.index(mapped_rules)
 
         selected_rules = st.selectbox(
-            "规则文件选择",
+            "Rules File",
             options=rules_options,
             index=default_rules_index,
-            help="选择用于过滤/分组的CSV；Uploaded优先使用上面上传的文件。",
+            help="Select CSV for filtering/grouping; 'Uploaded' uses the file uploaded above.",
         )
 
-        refresh = st.button("手动刷新", help="清除缓存并重新从数据库拉取")
+        refresh = st.button("Refresh", help="Clear cache and reload from database")
         if refresh:
             load_data.clear()
             st.rerun()
@@ -249,10 +249,10 @@ def main() -> None:
 
     dff = dff[(dff["date"] >= start_date) & (dff["date"] <= end_date)]
 
-    dff = dff[~dff["内容"].astype(str).str.contains("备用", na=False)].copy()
+    dff = dff[~dff["content"].astype(str).str.contains("备用", na=False)].copy()
 
-    if "内容分组" in dff.columns:
-        dff = dff.drop(columns=["内容分组"])
+    if "content_group" in dff.columns:
+        dff = dff.drop(columns=["content_group"])
 
     rules_path = None
     if selected_rules not in {"None", "Uploaded"}:
@@ -261,26 +261,26 @@ def main() -> None:
     dff, rules_info = _apply_csv_rules(dff, rules)
 
     if dff.empty:
-        st.info("当前筛选条件下没有数据。")
+        st.info("No data available for the current filter selection.")
         st.stop()
 
     # ---- Metrics ----
     total_occ = int(dff["occurance"].sum())
     st.caption(
-        "数据来源：MariaDB"
-        f"（MARIADB_HOST={os.getenv('MARIADB_HOST', '127.0.0.1')}），当前筛选总occurance={total_occ}"
+        "Data source: MariaDB"
+        f" (MARIADB_HOST={os.getenv('MARIADB_HOST', '127.0.0.1')}), filtered total occurance={total_occ}"
     )
     if rules_info:
         st.caption(
-            f"CSV规则：过滤{rules_info['excluded_rows']}行；分组{rules_info['grouped_codes']}个error_code。"
+            f"CSV rules: excluded {rules_info['excluded_rows']} rows; grouped {rules_info['grouped_codes']} error_codes."
         )
 
     date_range_label = f"{start_date} to {end_date}"
     machine_label = selected_machine
     title_suffix = f" | Machine: {machine_label} | Dates: {date_range_label}"
 
-    content_col = "内容分组" if "内容分组" in dff.columns else "内容"
-    st.subheader(f"日期范围内 {content_col} 总数（occurance）")
+    content_col = "content_group" if "content_group" in dff.columns else "content"
+    st.subheader(f"Total {content_col} in Date Range")
     total_content = (
         dff.groupby(content_col, as_index=False)["occurance"].sum()
         .sort_values("occurance", ascending=False)
@@ -338,8 +338,8 @@ def main() -> None:
         drill_fig.update_traces(textposition="outside", cliponaxis=False)
         st.plotly_chart(drill_fig, use_container_width=True)
 
-    # ---- Chart: daily occurrences split by Top N 内容 ----
-    st.subheader(f"按天 Top {int(topn)} 内容（occurance）")
+    # ---- Chart: daily occurrences split by Top N content ----
+    st.subheader(f"Per Day Top {int(topn)} Log (occurance)")
 
     daily_content = (
         dff.groupby(["date", content_col], as_index=False)["occurance"].sum()
@@ -392,7 +392,7 @@ def main() -> None:
     fig.update_traces(textposition="outside", cliponaxis=False)
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("明细（可导出）")
+    st.subheader("detail sheet")
     st.dataframe(
         dff.sort_values(["date", "occurance"], ascending=[False, False]),
         use_container_width=True,
