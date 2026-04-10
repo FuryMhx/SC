@@ -1,8 +1,11 @@
 error_code,content,flag
-527,downstream network communication failure,include
+527,downstream network communication failure,exclude
 589,,exclude
 337,abnormal wafer,include
-571,downstream not asked for slice,include
-565,paper nest change,include
-592,waiting for upstream wafer,include
-248,
+571,downstream not asked for slice,exclude
+565,paper nest change,exclude
+592,waiting for upstream wafer,exclude
+571,downstream not asked for slice,exclude
+523,shielding the camera data status,exclude
+525,Scrub the screen status,exclude
+283,The light curtain is triggered,exclude
