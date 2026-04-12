@@ -1,11 +1,20 @@
 error_code,content,flag
 527,downstream network communication failure,exclude
 589,,exclude
-337,abnormal wafer,include
+337,abnormal wafer,exclude
 571,downstream not asked for slice,exclude
 565,paper nest change,exclude
 592,waiting for upstream wafer,exclude
-571,downstream not asked for slice,exclude
 523,shielding the camera data status,exclude
 525,Scrub the screen status,exclude
 283,The light curtain is triggered,exclude
+592,waiting for upstream slice,exclude
+337,abnormal wafer found at cylinfer,exclude
+567,Furnace without slice,exclude
+561,Reel motor station 3 not reset,exclude
+562,Reel motor station 4 not reset,exclude
+560,Reel motor station 2 not reset,exclude
+559,Reel motor station 1 not reset,exclude
+572,mesh plate life reached,exclude
+563,paper roll used up,exclude
+

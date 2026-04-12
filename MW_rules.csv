@@ -3,9 +3,9 @@ error_code,keyword,group_label,flag
 ,Mark点上边宽度差,mark point distance,include
 ,缺角,detected breakage,include
 ,通讯超时|communication timeout,camera communication timeout,include
-,光幕|light curtain,light curtain interference,include
+,光幕|light curtain,light curtain interference,exclude
 ,26,Wafer-in-Nest sensor blocked,include
-,光幕,door open,include
+,光幕,door open,exclude
 ,31CV1,CV1 Wafer input failed,include
 ,32CV2,CV2 Wafer input failed,include
 ,33CV3,CV3 Wafer input failed,include
@@ -16,9 +16,9 @@ error_code,keyword,group_label,flag
 ,58C,Table C change paper roll warning,include
 ,59D,Table D change paper roll warning,include
 ,出片,Out wafer detect screen break,include
-,后右门锁异常,Abnormal rear right door lock detection,include
-,安全门1异常,Security Gate 1 is abnormal,include
-,安全门2异常,Security Gate 2 is abnormal,include
+,后右门锁异常,Abnormal rear right door lock detection,exclude
+,安全门1异常,Security Gate 1 is abnormal,exclude
+,安全门2异常,Security Gate 2 is abnormal,exclude
 ,A马达,Table A Motor out of moving range,include
 ,B马达,Table B Motor out of moving range,include
 ,C马达,Table C Motor out of moving range,include
@@ -34,3 +34,8 @@ error_code,keyword,group_label,flag
 ,超级管理员Identity login !,action filter,exclude
 ,管理员退出登录!,action filter,exclude
 ,需要重启软件恢复!,action filter,exclude
+,127non print wafer,non print wafer > 5pcs,exclude
+,19 abnormal weighting of 2 curtain cylinder,abnormal weighting,exclude
+,75门吸2,Door suction 2 abnormal,exclude
+,74 security gate 2 abnormal,exclude
+
