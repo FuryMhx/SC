@@ -39,10 +39,18 @@ def _load_rules_csv(uploaded_file, selected_path: str | None) -> pd.DataFrame:
         if "group_label" not in rules.columns:
             rules["group_label"] = rules.get("content", "").fillna("")
     else:
-        # Legacy CSVs may only have "content" as the display label.
-        rules["keyword"] = ""
+        # Legacy CSVs only have "content"; for rows without an error_code,
+        # treat content as a keyword so content-based filtering works.
+        content_vals = (
+            rules["content"].fillna("") if "content" in rules.columns
+            else pd.Series("", index=rules.index)
+        )
+        blank_code = rules["error_code"].isna() | (
+            rules["error_code"].astype(str).str.strip() == ""
+        )
+        rules["keyword"] = content_vals.where(blank_code, other="")
         if "group_label" not in rules.columns:
-            rules["group_label"] = rules.get("content", "").fillna("")
+            rules["group_label"] = content_vals
 
     if "group_label" in rules.columns:
         rules["group_label"] = rules["group_label"].fillna("")
@@ -98,8 +106,11 @@ def _apply_csv_rules(df: pd.DataFrame, rules: pd.DataFrame) -> tuple[pd.DataFram
                 continue
             keywords = _split_keywords(keyword)
             if pd.isna(code):
+                # No error_code in the rule → only target log rows that also
+                # have no error_code, matched by keyword.
+                no_code_mask = df_out["error_code"].isna()
                 for key in keywords:
-                    drop_mask |= content_key.str.contains(key, na=False)
+                    drop_mask |= no_code_mask & content_key.str.contains(key, na=False)
             else:
                 code_mask = df_out["error_code"] == int(code)
                 for key in keywords:

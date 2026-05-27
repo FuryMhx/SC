@@ -17,4 +17,5 @@ error_code,content,flag
 559,Reel motor station 1 not reset,exclude
 572,mesh plate life reached,exclude
 563,paper roll used up,exclude
-
+,扫描plc更新界面,exclude
+,自动运行后台,exclude

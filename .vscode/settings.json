@@ -1,0 +1,15 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "10.1.3.102",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "Printer",
+            "database": "postgres",
+            "username": "printer_data",
+            "password": "printer_data"
+        }
+    ]
+}
