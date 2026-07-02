@@ -17,5 +17,22 @@ error_code,content,flag
 559,Reel motor station 1 not reset,exclude
 572,mesh plate life reached,exclude
 563,paper roll used up,exclude
+519,turntable initialization failure,exclude
 ,扫描plc更新界面,exclude
 ,自动运行后台,exclude
+,DaHua,exclude
+281,intialization not completed,exclude
+,成功保存参数,exclude
+,软件启动,exclude
+235,,exclude
+,光源通信,exclude
+,清洗网板,exclude
+248,XYT平台,exclude
+520,XYT平台,exclude
+,叠印功能,exclude
+343,出版位台面硅片丢失,exclude
+,配置界面,exclude
+,软件被厂商,exclude
+,成功读取,exclude
+564,Roll paper,exclude
+566,Roll paper,exclude

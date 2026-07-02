@@ -2,7 +2,7 @@ error_code,keyword,group_label,flag
 ,不能找到Mark点!,camera cant find mark point ,include
 ,Mark点上边宽度差,mark point distance,include
 ,缺角,detected breakage,include
-,通讯超时|Camera commun,camera communication timeout,include
+,相机通讯超时|Camera commun,camera communication timeout,include
 ,光幕|light curtain,light curtain interference,exclude
 ,26,Wafer-in-Nest sensor blocked,include
 ,光幕,door open,exclude
@@ -31,12 +31,16 @@ error_code,keyword,group_label,flag
 ,卷纸旋钮,action filter,exclude
 ,44,action filter,exclude
 ,43,action filter,exclude
-,SuperManagerIdentity login !,action filter,exclude
-,超级管理员Identity login !,action filter,exclude
-,管理员退出登录!,action filter,exclude
+,SuperManagerIdentity,action filter,exclude
+,超级管理员,action filter,exclude
+,管理员退出,action filter,exclude
 ,需要重启软件恢复!,action filter,exclude
 ,127non print wafer,non print wafer > 5pcs,exclude
 ,19 abnormal weighting of 2 curtain cylinder,abnormal weighting,exclude
-,75门吸2,Door suction 2 abnormal,exclude
-,74 security gate 2 abnormal,exclude
+,75门吸2,Door sensor alarm,exclude
+,74Security Gate 1,Door sensor alarm,exclude
+,75Security Gate 2,Door sensor alarm,exclude
 ,已超范围,Out of motion range,include
+,127Non Printed wafer,non print wafer > 5pcs,exclude
+,3weighting 1 door curtain,Door sensor alarm,exclude
+
