@@ -2,7 +2,7 @@
 # (From this folder: C:\Users\HexiMeng\Desktop\SC)
 
 # Pin core scientific stack to Python 3.13-compatible wheels
-numpy==2.2.*
+numpy>=2.1,<3
 pandas==2.2.*
 # PostgreSQL driver (Python 3.13-friendly on Windows)
 psycopg[binary]==3.2.*
